@@ -7,6 +7,7 @@
 #include <vector>
 
 std::vector<std::string> process_text(std::ifstream& data);
+void assemble(std::ofstream& o_file, std::vector<std::string>& data);
 
 int main(int argc, char *argv[]) {
   std::cout<<"Using AS-6502 : v"<<__V_MAJOR__<<"."<<__V_MINOR__<<"\n";
@@ -59,6 +60,7 @@ int main(int argc, char *argv[]) {
   }
   
   std::vector<std::string> processed = process_text(f_i_file);
+  assemble(f_o_file, processed);
   
   f_i_file.close();
   f_o_file.close();
@@ -71,9 +73,24 @@ std::vector<std::string> process_text(std::ifstream& data) {
 
   std::string segment;
   while(data >> segment) {
+    for(unsigned int i=0; i<segment.size(); ++i) {
+      switch(segment[i]) {
+      case ':':
+	std::cout<<"[Segment] : "<<segment<<"\n";
+	_out.push_back(segment.substr(0, i+1));
+	break;
+      default:
+	break;
+      }
+    }
+
     std::cout<<"[Segment] : "<<segment<<"\n";
     _out.push_back(segment);
   }
   
   return _out;
+}
+
+void assemble(std::ofstream& o_file, std::vector<std::string>& data) {
+  
 }
