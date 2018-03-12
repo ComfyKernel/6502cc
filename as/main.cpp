@@ -92,6 +92,7 @@ typedef std::tuple<unsigned int, addr_mode, unsigned int, std::string> opcode;
 
 void segment_text(std::ifstream& data, std::vector<std::string>& out);
 bool process(std::vector<opcode>& out, std::vector<std::string>& data);
+bool compile(std::ofstream& out, std::vector<opcode>& opcodes);
 
 int main(int argc, char *argv[]) {
   std::cout<<"Using AS-6502 : v"<<__V_MAJOR__<<"."<<__V_MINOR__<<"\n";
@@ -150,6 +151,11 @@ int main(int argc, char *argv[]) {
   if(!process(opcodes, segmented)) {
     std::cout<<"Preprocessing failed!\n";
     return 5;
+  }
+
+  if(!compile(f_o_file, opcodes)) {
+    std::cout<<"Compilation failed!\n";
+    return 6;
   }
   
   f_i_file.close();
@@ -315,6 +321,32 @@ bool process(std::vector<opcode>& out, std::vector<std::string>& data) {
     if(!opcode_found) {
       std::cout<<"\e[31mError!\e[0m Unknown opcode encountered! '"<<data[i]<<"'\n";
       return false;
+    }
+  }
+
+  return true;
+}
+
+bool compile(std::ofstream& out, std::vector<opcode>& opcodes) {
+  int8_t val;
+  
+  for(const auto& i : opcodes) {
+    val = std::get<0>(i) & 0xFF;
+    out.write((char*)&val, sizeof(int8_t));
+
+    switch(std::get<1>(i)) {
+    case AM_ABSOLUTE:
+    case AM_ABSOLUTE_X:
+    case AM_ABSOLUTE_Y:
+    case AM_INDIRECT:
+      val = std::get<2>(i) & 0xFF;
+      out.write((char*)&val, sizeof(int8_t));
+      val = (std::get<2>(i) & 0xFF00) >> 8;
+      out.write((char*)&val, sizeof(int8_t));
+      break;
+    default:
+      val = std::get<2>(i) & 0xFF;
+      out.write((char*)&val, sizeof(int8_t));
     }
   }
 
