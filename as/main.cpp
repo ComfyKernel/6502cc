@@ -75,7 +75,17 @@ _op_pair _opcodes[]={
   _op_pair("sta", AM_ABSOLUTE_X, 0x9D),
   _op_pair("sta", AM_ABSOLUTE_Y, 0x99),
   _op_pair("sta", AM_INDIRECT_X, 0x81),
-  _op_pair("sta", AM_INDIRECT_Y, 0x91)
+  _op_pair("sta", AM_INDIRECT_Y, 0x91),
+  
+  _op_pair("ldx", AM_IMMEDIATE , 0xA2),
+  _op_pair("ldx", AM_ZEROPAGE  , 0xA6),
+  _op_pair("ldx", AM_ZEROPAGE_Y, 0xB6),
+  _op_pair("ldx", AM_ABSOLUTE  , 0xAE),
+  _op_pair("ldx", AM_ABSOLUTE_Y, 0xBE),
+  
+  _op_pair("stx", AM_ZEROPAGE  , 0x86),
+  _op_pair("stx", AM_ZEROPAGE_Y, 0x96),
+  _op_pair("stx", AM_ABSOLUTE  , 0x8E),
 };
 
 typedef std::tuple<unsigned int, addr_mode, unsigned int, std::string> opcode;
