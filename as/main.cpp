@@ -67,7 +67,15 @@ _op_pair _opcodes[]={
   _op_pair("lda", AM_ABSOLUTE_X, 0xBD),
   _op_pair("lda", AM_ABSOLUTE_Y, 0xB9),
   _op_pair("lda", AM_INDIRECT_X, 0xA1),
-  _op_pair("lda", AM_INDIRECT_Y, 0xB1)
+  _op_pair("lda", AM_INDIRECT_Y, 0xB1),
+  
+  _op_pair("sta", AM_ZEROPAGE  , 0x85),
+  _op_pair("sta", AM_ZEROPAGE_X, 0x95),
+  _op_pair("sta", AM_ABSOLUTE  , 0x8D),
+  _op_pair("sta", AM_ABSOLUTE_X, 0x9D),
+  _op_pair("sta", AM_ABSOLUTE_Y, 0x99),
+  _op_pair("sta", AM_INDIRECT_X, 0x81),
+  _op_pair("sta", AM_INDIRECT_Y, 0x91)
 };
 
 typedef std::tuple<unsigned int, addr_mode, unsigned int, std::string> opcode;
@@ -201,10 +209,13 @@ bool get_number(const std::string& in, int& num, int& length, bool& isaddr) {
 
 bool process(std::vector<opcode>& out, std::vector<std::string>& data) {
   for(unsigned int i=0; i<data.size(); ++i) {
+    bool opcode_found = false;
+    
     for(const auto& o : _opcodes) {
       if(std::get<0>(o) == data[i]) {
 	// std::cout<<"[Opcode] : "<<std::get<0>(o)<<"\n";
-
+	opcode_found = true;
+	
 	bool is_addr    = false;
 	int  num        = 0;
 	int  len        = 0;
@@ -280,17 +291,20 @@ bool process(std::vector<opcode>& out, std::vector<std::string>& data) {
 	  return false;
 	}
 
-	std::cout<<"[OP] : '"<<std::get<0>(o)<<"' [OPER] : '"<<num
-		 <<"' [OPER2] : '"<<str<<"' [MODE] '"<<get_addr_name(mode)<<"'\n";
+	std::cout<<"[OP] : '"<<std::get<0>(o)<<" (0x"<<std::hex<<std::get<2>(o)<<std::dec
+		 <<")' [OPER] : '"<<num<<"' [OPER2] : '"<<str<<"' [MODE] '"
+		 <<get_addr_name(mode)<<"'\n";
 
 	out.push_back(opcode(std::get<2>(o), mode, num, str));
 	
 	++i;
 	break;
-      } else {
-	std::cout<<"\e[31mError!\e[0m Unknown opcode encountered! '"<<data[i]<<"'\n";
-	return false;
       }
+    }
+
+    if(!opcode_found) {
+      std::cout<<"\e[31mError!\e[0m Unknown opcode encountered! '"<<data[i]<<"'\n";
+      return false;
     }
   }
 
