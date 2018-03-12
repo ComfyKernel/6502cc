@@ -70,8 +70,10 @@ _op_pair _opcodes[]={
   _op_pair("lda", AM_INDIRECT_Y, 0xB1)
 };
 
+typedef std::tuple<unsigned int, addr_mode, unsigned int, std::string> opcode;
+
 void segment_text(std::ifstream& data, std::vector<std::string>& out);
-bool process(std::ofstream& o_file, std::vector<std::string>& data);
+bool process(std::vector<opcode>& out, std::vector<std::string>& data);
 
 int main(int argc, char *argv[]) {
   std::cout<<"Using AS-6502 : v"<<__V_MAJOR__<<"."<<__V_MINOR__<<"\n";
@@ -125,7 +127,9 @@ int main(int argc, char *argv[]) {
 
   std::vector<std::string> segmented;
   segment_text(f_i_file, segmented);
-  if(!process(f_o_file, segmented)) {
+
+  std::vector<opcode> opcodes;
+  if(!process(opcodes, segmented)) {
     std::cout<<"Preprocessing failed!\n";
     return 5;
   }
@@ -189,21 +193,22 @@ bool get_number(const std::string& in, int& num, int& length, bool& isaddr) {
     return false;
   }
 
-  std::cout<<"[Num] '"<<num<<"', Base : '"<<base<<"', Is Address : '"
-	   <<std::boolalpha<<isaddr<<std::noboolalpha<<"'\n";
+  /*std::cout<<"[Num] '"<<num<<"', Base : '"<<base<<"', Is Address : '"
+    <<std::boolalpha<<isaddr<<std::noboolalpha<<"'\n";*/
 
   return true;
 }
 
-bool process(std::ofstream& o_file, std::vector<std::string>& data) {
+bool process(std::vector<opcode>& out, std::vector<std::string>& data) {
   for(unsigned int i=0; i<data.size(); ++i) {
     for(const auto& o : _opcodes) {
       if(std::get<0>(o) == data[i]) {
-	std::cout<<"[Opcode] : "<<std::get<0>(o)<<"\n";
+	// std::cout<<"[Opcode] : "<<std::get<0>(o)<<"\n";
 
-	bool is_addr = false;
-	int  num     = 0;
-	int  len     = 0;
+	bool is_addr    = false;
+	int  num        = 0;
+	int  len        = 0;
+	std::string str = "";
 
 	if (!get_number(data[i + 1], num, len, is_addr)) {
 	  std::cout<<"\e[31mError!\e[0m Expecting number after '"<<std::get<0>(o)
@@ -262,7 +267,7 @@ bool process(std::ofstream& o_file, std::vector<std::string>& data) {
 	    }
 
 	    if(is_mode) {
-	      std::cout<<"[Mode] '"<<get_addr_name(std::get<1>(eo))<<"'\n";
+	      // std::cout<<"[Mode] '"<<get_addr_name(std::get<1>(eo))<<"'\n";
 	      mode = std::get<1>(eo);
 	      break;
 	    }
@@ -274,6 +279,11 @@ bool process(std::ofstream& o_file, std::vector<std::string>& data) {
 		   <<std::get<0>(o)<<" "<<data[i + 1]<<"'\n";
 	  return false;
 	}
+
+	std::cout<<"[OP] : '"<<std::get<0>(o)<<"' [OPER] : '"<<num
+		 <<"' [OPER2] : '"<<str<<"' [MODE] '"<<get_addr_name(mode)<<"'\n";
+
+	out.push_back(opcode(std::get<2>(o), mode, num, str));
 	
 	++i;
 	break;
