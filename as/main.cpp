@@ -167,6 +167,10 @@ bool process(std::vector<opcode>& out, std::vector<std::string>& data,
   
   for(unsigned int i=0; i<data.size(); ++i) {
     if(data[i] == "#org") {
+      if(verbose_logging) {
+	std::cout<<"Found an Origin directive\n";
+      }
+      
       int _unused=0;
       bool _u;
       int num = 0;
@@ -177,7 +181,9 @@ bool process(std::vector<opcode>& out, std::vector<std::string>& data,
       }
 
       offset = num;
-      i++;
+      data.erase(data.begin() + i);
+      data.erase(data.begin() + i);
+      i--;
       continue;
     }
     

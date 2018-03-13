@@ -1,3 +1,5 @@
+#org $600
+
 start:
 	jmp init
 
