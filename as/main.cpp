@@ -10,83 +10,8 @@
 
 #include <exception>
 
-enum addr_mode {
-  AM_IMMEDIATE   = 0x0,
-  AM_ACCUMULATOR = 0x1,
-  AM_IMPLIED     = 0x2,
-  AM_RELATIVE    = 0x3,
-  AM_ABSOLUTE    = 0x4,
-  AM_ABSOLUTE_X  = 0x5,
-  AM_ABSOLUTE_Y  = 0x6,
-  AM_ZEROPAGE    = 0x7,
-  AM_ZEROPAGE_X  = 0x8,
-  AM_ZEROPAGE_Y  = 0x9,
-  AM_INDIRECT    = 0xA,
-  AM_INDIRECT_X  = 0xB,
-  AM_INDIRECT_Y  = 0xC,
-  AM_NONE        = 0xD
-};
-
-typedef std::pair<std::string, addr_mode> __addr_name;
-__addr_name __addr_name_table[]={
-  __addr_name("immediate"  , AM_IMMEDIATE),
-  __addr_name("accumulator", AM_ACCUMULATOR),
-  __addr_name("implied"    , AM_IMPLIED),
-  __addr_name("relative"   , AM_RELATIVE),
-  __addr_name("absolute"   , AM_ABSOLUTE),
-  __addr_name("absolute x" , AM_ABSOLUTE_X),
-  __addr_name("absolute y" , AM_ABSOLUTE_Y),
-  __addr_name("zero page"  , AM_ZEROPAGE),
-  __addr_name("zero page x", AM_ZEROPAGE_X),
-  __addr_name("zero page y", AM_ZEROPAGE_Y),
-  __addr_name("indirect"   , AM_INDIRECT),
-  __addr_name("indirect x" , AM_INDIRECT_X),
-  __addr_name("indirect y" , AM_INDIRECT_Y),
-  __addr_name("none"       , AM_NONE)
-};
-
-const std::string __addr_name_invalid="[Invalid Name]";
-
-std::string get_addr_name(addr_mode mode) {
-  for(const auto& i : __addr_name_table) {
-    if(i.second == mode) {
-      return i.first;
-    }
-  }
-
-  return __addr_name_invalid;
-}
-
-typedef std::tuple<std::string, addr_mode, unsigned int> _op_pair;
-
-_op_pair _opcodes[]={
-  _op_pair("lda", AM_IMMEDIATE , 0xA9),
-  _op_pair("lda", AM_ZEROPAGE  , 0xA5),
-  _op_pair("lda", AM_ZEROPAGE_X, 0xB5),
-  _op_pair("lda", AM_ABSOLUTE  , 0xAD),
-  _op_pair("lda", AM_ABSOLUTE_X, 0xBD),
-  _op_pair("lda", AM_ABSOLUTE_Y, 0xB9),
-  _op_pair("lda", AM_INDIRECT_X, 0xA1),
-  _op_pair("lda", AM_INDIRECT_Y, 0xB1),
-  
-  _op_pair("sta", AM_ZEROPAGE  , 0x85),
-  _op_pair("sta", AM_ZEROPAGE_X, 0x95),
-  _op_pair("sta", AM_ABSOLUTE  , 0x8D),
-  _op_pair("sta", AM_ABSOLUTE_X, 0x9D),
-  _op_pair("sta", AM_ABSOLUTE_Y, 0x99),
-  _op_pair("sta", AM_INDIRECT_X, 0x81),
-  _op_pair("sta", AM_INDIRECT_Y, 0x91),
-  
-  _op_pair("ldx", AM_IMMEDIATE , 0xA2),
-  _op_pair("ldx", AM_ZEROPAGE  , 0xA6),
-  _op_pair("ldx", AM_ZEROPAGE_Y, 0xB6),
-  _op_pair("ldx", AM_ABSOLUTE  , 0xAE),
-  _op_pair("ldx", AM_ABSOLUTE_Y, 0xBE),
-  
-  _op_pair("stx", AM_ZEROPAGE  , 0x86),
-  _op_pair("stx", AM_ZEROPAGE_Y, 0x96),
-  _op_pair("stx", AM_ABSOLUTE  , 0x8E),
-};
+#include "addressing.hpp"
+#include "opcodes.hpp"
 
 bool verbose_logging = false;
 
@@ -104,9 +29,10 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
-  bool o_set = false;
+  bool o_set = false,
+       c_set = false;
 
-  std::string o_file;
+  std::string o_file, o_ext;
   std::string i_file;
   
   for(int i=1; i<argc; ++i) {
@@ -123,15 +49,21 @@ int main(int argc, char *argv[]) {
     } else if(strcmp(argv[i], "-v") == 0 ||
 	      strcmp(argv[i], "--verbose") == 0) {
       verbose_logging = true;
+      
+    } else if(strcmp(argv[i], "-c") == 0) {
+      c_set = true;
+      o_ext = ".o";
     } else {
       i_file = argv[i];
-
-      if(!o_set) {
-	o_set = true;
-
-	o_file = i_file.substr(0, i_file.find_last_of(".")) + ".o";
-      }
     }
+  }
+
+  if(!c_set) {
+    o_ext = ".bin";
+  }
+
+  if(!o_set) {
+    o_file = i_file.substr(0, i_file.find_last_of(".")) + o_ext;
   }
 
   std::cout<<"Assembling file "<<i_file<<" to "<<o_file<<"\n";

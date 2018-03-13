@@ -1,5 +1,5 @@
 VERSION_MAJOR=0
-VERSION_MINOR=4
+VERSION_MINOR=5
 
 CC      = g++
 CFLAGS  = -std=c++11 -Wall -Wextra -O2 -D__V_MAJOR__=$(VERSION_MAJOR)\
