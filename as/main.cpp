@@ -5,6 +5,7 @@
 #include <cstring>
 #include <string>
 
+#include <utility>
 #include <vector>
 #include <tuple>
 
@@ -16,9 +17,11 @@
 bool verbose_logging = false;
 
 typedef std::tuple<unsigned int, addr_mode, unsigned int, std::string> opcode;
+typedef std::pair <std::string, unsigned int> label;
 
 void segment_text(std::ifstream& data, std::vector<std::string>& out);
-bool process(std::vector<opcode>& out, std::vector<std::string>& data);
+bool process(std::vector<opcode>& out, std::vector<std::string>& data,
+	     std::vector<label>& labels);
 bool compile(std::ofstream& out, std::vector<opcode>& opcodes);
 
 int main(int argc, char *argv[]) {
@@ -84,9 +87,10 @@ int main(int argc, char *argv[]) {
   std::vector<std::string> segmented;
   segment_text(f_i_file, segmented);
 
+  std::vector<label>  labels;
   std::vector<opcode> opcodes;
-  if(!process(opcodes, segmented)) {
-    std::cout<<"Preprocessing failed!\n";
+  if(!process(opcodes, segmented, labels)) {
+    std::cout<<"Processing failed!\n";
     return 5;
   }
 
@@ -106,19 +110,6 @@ int main(int argc, char *argv[]) {
 void segment_text(std::ifstream& data, std::vector<std::string>& out) {
   std::string segment;
   while(data >> segment) {
-    for(unsigned int i=0; i<segment.size(); ++i) {
-      switch(segment[i]) {
-      case ':':
-	if(verbose_logging) {
-	  std::cout<<"[Segment] : "<<segment<<"\n";
-	}
-	out.push_back(segment.substr(0, i+1));
-	break;
-      default:
-	break;
-      }
-    }
-
     if(verbose_logging) {
       std::cout<<"[Segment] : "<<segment<<"\n";
     }
@@ -168,7 +159,89 @@ bool get_number(const std::string& in, int& num, int& length, bool& isaddr) {
   return true;
 }
 
-bool process(std::vector<opcode>& out, std::vector<std::string>& data) {
+bool process(std::vector<opcode>& out, std::vector<std::string>& data,
+	     std::vector<label>& labels) {
+  std::cout<<"[PR] First pass\n";
+
+  int offset = 0;
+  
+  for(unsigned int i=0; i<data.size(); ++i) {
+    if(data[i] == "#org") {
+      int _unused=0;
+      bool _u;
+      int num = 0;
+
+      if(!get_number(data[i + 1], num, _unused, _u)) {
+	std::cout<<"\e[31mError!\e[0m #org directive expects a number\n";
+	return false;
+      }
+
+      offset = num;
+      i++;
+      continue;
+    }
+    
+    bool is_label = false;
+    
+    if(!(i+1 >= data.size())) {
+      if(data[i + 1][0] == ':') {
+	is_label = true;
+      }
+    }
+
+    if(data[i].back() == ':') {
+      is_label = true;
+    }
+
+    if(is_label) {
+      labels.push_back(label(data[i].substr(0, data[i].size() - 1),
+			     offset));
+		       
+      if(verbose_logging) {
+	std::cout<<"Found Label : "<<labels[labels.size() - 1].first<<" at : "
+		 <<labels[labels.size() - 1].second<<"\n";
+      }
+
+      continue;
+    }
+
+    bool a_op = false,
+         b_op = false,
+         c_op = false;
+    
+    for(const auto& o : _opcodes) {
+      if(std::get<0>(o) == data[i]) {
+	a_op = true;
+      }
+
+      if(std::get<0>(o) == data[i + 1]) {
+	b_op = true;
+      }
+
+      if(std::get<0>(o) == data[i + 2]) {
+	c_op = true;
+      }
+    }
+
+    int len = 0;
+    
+    if(a_op) {
+      len += 1;
+    }
+
+    if(!b_op) {
+      len += 1;
+    }
+
+    if(!c_op && !b_op) {
+      len += 1;
+    }
+
+    offset += len;
+  }
+
+  std::cout<<"[PR] Second pass\n";
+
   for(unsigned int i=0; i<data.size(); ++i) {
     bool opcode_found = false;
     
@@ -176,74 +249,102 @@ bool process(std::vector<opcode>& out, std::vector<std::string>& data) {
       if(std::get<0>(o) == data[i]) {
 	// std::cout<<"[Opcode] : "<<std::get<0>(o)<<"\n";
 	opcode_found = true;
-	
+
+	bool implied    = false;
 	bool is_addr    = false;
 	int  num        = 0;
 	int  len        = 0;
 	std::string str = "";
 
-	if (!get_number(data[i + 1], num, len, is_addr)) {
-	  std::cout<<"\e[31mError!\e[0m Expecting number after '"<<std::get<0>(o)
-		   <<"', Instead got '"<<data[i + 1]<<"'\n";
-	  return false;
+	if(std::get<1>(o) == AM_IMPLIED) {
+	  implied = true;
+	}
+
+	if (!get_number(data[i + 1], num, len, is_addr) && !implied) {
+	  bool is_label = false;
+	  
+	  for(const auto& l : labels) {
+	    if(l.first == data[i + 1]) {
+	      num = l.second;
+	      len = 4;
+	      is_addr = true;
+	      is_label = true;
+
+	      if(verbose_logging) {
+		std::cout<<"[LBL] Substituting num for label : "<<l.first<<"\n";
+	      }
+	      
+	      break;
+	    }
+	  }
+
+	  if(!is_label) {
+	    std::cout<<"\e[31mError!\e[0m Expecting number after '"<<std::get<0>(o)
+		     <<"', Instead got '"<<data[i + 1]<<"'\n";
+	    return false;
+	  }
 	}
 
 	std::vector<addr_mode> excluded_addrs;
 
-	if(len <= 2) {
-	  excluded_addrs.push_back(AM_ABSOLUTE);
-	  excluded_addrs.push_back(AM_ABSOLUTE_X);
-	  excluded_addrs.push_back(AM_ABSOLUTE_Y);
-	} else if(len <= 4) {
-	  excluded_addrs.push_back(AM_IMMEDIATE);
-	  excluded_addrs.push_back(AM_ACCUMULATOR);
-	  excluded_addrs.push_back(AM_ZEROPAGE);
-	  excluded_addrs.push_back(AM_ZEROPAGE_X);
-	  excluded_addrs.push_back(AM_ZEROPAGE_X);
-	  excluded_addrs.push_back(AM_INDIRECT);
-	  excluded_addrs.push_back(AM_INDIRECT_X);
-	  excluded_addrs.push_back(AM_INDIRECT_Y);
-	  excluded_addrs.push_back(AM_IMPLIED);
-	} else {
-	  std::cout<<"\e[31mError!\e[0m Invalid number length '"<<len<<"'\n";
-	}
-
-	if(is_addr) {
-	  excluded_addrs.push_back(AM_IMMEDIATE);
-	  excluded_addrs.push_back(AM_ACCUMULATOR);
-	  excluded_addrs.push_back(AM_IMPLIED);
-	} else {
-	  excluded_addrs.push_back(AM_RELATIVE);
-	  excluded_addrs.push_back(AM_ABSOLUTE);
-	  excluded_addrs.push_back(AM_ABSOLUTE_X);
-	  excluded_addrs.push_back(AM_ABSOLUTE_Y);
-	  excluded_addrs.push_back(AM_ZEROPAGE);
-	  excluded_addrs.push_back(AM_ZEROPAGE_X);
-	  excluded_addrs.push_back(AM_ZEROPAGE_Y);
-	  excluded_addrs.push_back(AM_INDIRECT);
-	  excluded_addrs.push_back(AM_INDIRECT_X);
-	  excluded_addrs.push_back(AM_INDIRECT_Y);
-	}
-
 	addr_mode mode = AM_NONE;
 
-	for(const auto& eo : _opcodes) {
-	  if(std::get<0>(eo) == std::get<0>(o)) {
-	    bool is_mode = true;
-	    
-	    for(const auto& e : excluded_addrs) {
-	      if(std::get<1>(eo) == e) {
-		is_mode = false;
+	if(!implied) {
+	  if(len <= 2) {
+	    excluded_addrs.push_back(AM_ABSOLUTE);
+	    excluded_addrs.push_back(AM_ABSOLUTE_X);
+	    excluded_addrs.push_back(AM_ABSOLUTE_Y);
+	  } else if(len <= 4) {
+	    excluded_addrs.push_back(AM_IMMEDIATE);
+	    excluded_addrs.push_back(AM_ACCUMULATOR);
+	    excluded_addrs.push_back(AM_ZEROPAGE);
+	    excluded_addrs.push_back(AM_ZEROPAGE_X);
+	    excluded_addrs.push_back(AM_ZEROPAGE_X);
+	    excluded_addrs.push_back(AM_INDIRECT);
+	    excluded_addrs.push_back(AM_INDIRECT_X);
+	    excluded_addrs.push_back(AM_INDIRECT_Y);
+	    excluded_addrs.push_back(AM_IMPLIED);
+	  } else {
+	    std::cout<<"\e[31mError!\e[0m Invalid number length '"<<len<<"'\n";
+	  }
+	  
+	  if(is_addr) {
+	    excluded_addrs.push_back(AM_IMMEDIATE);
+	    excluded_addrs.push_back(AM_ACCUMULATOR);
+	    excluded_addrs.push_back(AM_IMPLIED);
+	  } else {
+	    excluded_addrs.push_back(AM_RELATIVE);
+	    excluded_addrs.push_back(AM_ABSOLUTE);
+	    excluded_addrs.push_back(AM_ABSOLUTE_X);
+	    excluded_addrs.push_back(AM_ABSOLUTE_Y);
+	    excluded_addrs.push_back(AM_ZEROPAGE);
+	    excluded_addrs.push_back(AM_ZEROPAGE_X);
+	    excluded_addrs.push_back(AM_ZEROPAGE_Y);
+	    excluded_addrs.push_back(AM_INDIRECT);
+	    excluded_addrs.push_back(AM_INDIRECT_X);
+	    excluded_addrs.push_back(AM_INDIRECT_Y);
+	  }
+	  
+	  for(const auto& eo : _opcodes) {
+	    if(std::get<0>(eo) == std::get<0>(o)) {
+	      bool is_mode = true;
+	      
+	      for(const auto& e : excluded_addrs) {
+		if(std::get<1>(eo) == e) {
+		  is_mode = false;
+		  break;
+		}
+	      }
+	      
+	      if(is_mode) {
+		// std::cout<<"[Mode] '"<<get_addr_name(std::get<1>(eo))<<"'\n";
+		mode = std::get<1>(eo);
 		break;
 	      }
 	    }
-
-	    if(is_mode) {
-	      // std::cout<<"[Mode] '"<<get_addr_name(std::get<1>(eo))<<"'\n";
-	      mode = std::get<1>(eo);
-	      break;
-	    }
 	  }
+	} else {
+	  mode = AM_IMPLIED;
 	}
 
 	if(mode == AM_NONE) {
@@ -266,8 +367,24 @@ bool process(std::vector<opcode>& out, std::vector<std::string>& data) {
     }
 
     if(!opcode_found) {
-      std::cout<<"\e[31mError!\e[0m Unknown opcode encountered! '"<<data[i]<<"'\n";
-      return false;
+      bool is_label = false;
+
+      std::string l_tst = "";
+
+      if(data[i].back() == ':') {
+	l_tst = data[i].substr(0, data[i].size() - 1);
+      }
+      
+      for(const auto& l : labels) {
+	if(l.first == l_tst) {
+	  is_label = true;
+	}
+      }
+
+      if(!is_label) {
+	std::cout<<"\e[31mError!\e[0m Unknown opcode encountered! '"<<data[i]<<"'\n";
+	return false;
+      }
     }
   }
 
@@ -276,24 +393,28 @@ bool process(std::vector<opcode>& out, std::vector<std::string>& data) {
 
 bool compile(std::ofstream& out, std::vector<opcode>& opcodes) {
   int8_t val;
+
+  std::cout<<"Writing to file\n";
   
   for(const auto& i : opcodes) {
     val = std::get<0>(i) & 0xFF;
     out.write((char*)&val, sizeof(int8_t));
 
-    switch(std::get<1>(i)) {
-    case AM_ABSOLUTE:
-    case AM_ABSOLUTE_X:
-    case AM_ABSOLUTE_Y:
-    case AM_INDIRECT:
-      val = std::get<2>(i) & 0xFF;
-      out.write((char*)&val, sizeof(int8_t));
-      val = (std::get<2>(i) & 0xFF00) >> 8;
-      out.write((char*)&val, sizeof(int8_t));
-      break;
-    default:
-      val = std::get<2>(i) & 0xFF;
-      out.write((char*)&val, sizeof(int8_t));
+    if(std::get<1>(i) != AM_IMPLIED) {
+      switch(std::get<1>(i)) {
+      case AM_ABSOLUTE:
+      case AM_ABSOLUTE_X:
+      case AM_ABSOLUTE_Y:
+      case AM_INDIRECT:
+	val = std::get<2>(i) & 0xFF;
+	out.write((char*)&val, sizeof(int8_t));
+	val = (std::get<2>(i) & 0xFF00) >> 8;
+	out.write((char*)&val, sizeof(int8_t));
+	break;
+      default:
+	val = std::get<2>(i) & 0xFF;
+	out.write((char*)&val, sizeof(int8_t));
+      }
     }
   }
 

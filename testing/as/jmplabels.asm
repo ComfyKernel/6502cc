@@ -9,3 +9,5 @@ main:
 	lda #$F
 	sta $10
 	rts
+
+end:	
