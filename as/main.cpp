@@ -88,6 +88,8 @@ _op_pair _opcodes[]={
   _op_pair("stx", AM_ABSOLUTE  , 0x8E),
 };
 
+bool verbose_logging = false;
+
 typedef std::tuple<unsigned int, addr_mode, unsigned int, std::string> opcode;
 
 void segment_text(std::ifstream& data, std::vector<std::string>& out);
@@ -118,6 +120,9 @@ int main(int argc, char *argv[]) {
 	o_set = true;
 	i++;
       }
+    } else if(strcmp(argv[i], "-v") == 0 ||
+	      strcmp(argv[i], "--verbose") == 0) {
+      verbose_logging = true;
     } else {
       i_file = argv[i];
 
@@ -160,6 +165,8 @@ int main(int argc, char *argv[]) {
   
   f_i_file.close();
   f_o_file.close();
+
+  std::cout<<"\e[32mSuccess!\e[0m\n";
   
   return 0;
 }
@@ -170,7 +177,9 @@ void segment_text(std::ifstream& data, std::vector<std::string>& out) {
     for(unsigned int i=0; i<segment.size(); ++i) {
       switch(segment[i]) {
       case ':':
-	std::cout<<"[Segment] : "<<segment<<"\n";
+	if(verbose_logging) {
+	  std::cout<<"[Segment] : "<<segment<<"\n";
+	}
 	out.push_back(segment.substr(0, i+1));
 	break;
       default:
@@ -178,7 +187,9 @@ void segment_text(std::ifstream& data, std::vector<std::string>& out) {
       }
     }
 
-    std::cout<<"[Segment] : "<<segment<<"\n";
+    if(verbose_logging) {
+      std::cout<<"[Segment] : "<<segment<<"\n";
+    }
     out.push_back(segment);
   }
 }
@@ -217,8 +228,10 @@ bool get_number(const std::string& in, int& num, int& length, bool& isaddr) {
     return false;
   }
 
-  /*std::cout<<"[Num] '"<<num<<"', Base : '"<<base<<"', Is Address : '"
-    <<std::boolalpha<<isaddr<<std::noboolalpha<<"'\n";*/
+  if(verbose_logging) {
+    std::cout<<"[Num] '"<<num<<"', Base : '"<<base<<"', Is Address : '"
+	     <<std::boolalpha<<isaddr<<std::noboolalpha<<"'\n";
+  }
 
   return true;
 }
@@ -307,9 +320,11 @@ bool process(std::vector<opcode>& out, std::vector<std::string>& data) {
 	  return false;
 	}
 
-	std::cout<<"[OP] : '"<<std::get<0>(o)<<" (0x"<<std::hex<<std::get<2>(o)<<std::dec
-		 <<")' [OPER] : '"<<num<<"' [OPER2] : '"<<str<<"' [MODE] '"
-		 <<get_addr_name(mode)<<"'\n";
+	if(verbose_logging) {
+	  std::cout<<"[OP] : '"<<std::get<0>(o)<<" (0x"<<std::hex<<std::get<2>(o)<<std::dec
+		   <<")' [OPER] : '"<<num<<"' [OPER2] : '"<<str<<"' [MODE] '"
+		   <<get_addr_name(mode)<<"'\n";
+	}
 
 	out.push_back(opcode(std::get<2>(o), mode, num, str));
 	
