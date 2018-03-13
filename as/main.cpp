@@ -206,8 +206,7 @@ bool process(std::vector<opcode>& out, std::vector<std::string>& data,
     }
 
     bool a_op = false,
-         b_op = false,
-         c_op = false;
+         b_op = false;
     
     for(const auto& o : _opcodes) {
       if(std::get<0>(o) == data[i]) {
@@ -217,24 +216,41 @@ bool process(std::vector<opcode>& out, std::vector<std::string>& data,
       if(std::get<0>(o) == data[i + 1]) {
 	b_op = true;
       }
-
-      if(std::get<0>(o) == data[i + 2]) {
-	c_op = true;
-      }
     }
 
     int len = 0;
+
+    bool is_implied = false;
     
     if(a_op) {
       len += 1;
+
+      for(const auto& o : _opcodes) {
+	if(data[i] == std::get<0>(o)) {
+	  if(std::get<1>(o) == AM_IMPLIED) {
+	    is_implied = true;
+	  }
+
+	  break;
+	}
+      }
     }
 
-    if(!b_op) {
-      len += 1;
-    }
-
-    if(!c_op && !b_op) {
-      len += 1;
+    if(!b_op && !is_implied) {
+      int _unused=0;
+      bool _u;
+      int alen;
+      
+      if(!get_number(data[i + 1], _unused, alen, _u)) {
+	len += 2;
+	i++;
+      } else {
+	if(alen <= 2) {
+	  len += 1;
+	} else {
+	  len += 2;
+	}
+      }
     }
 
     offset += len;
