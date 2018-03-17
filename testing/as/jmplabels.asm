@@ -1,3 +1,5 @@
+#org $600
+
 start:
 	jmp init
 
@@ -9,3 +11,5 @@ main:
 	lda #$F
 	sta $10
 	rts
+
+end:	
